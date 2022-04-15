@@ -10,4 +10,4 @@ function log() {
     echo "$(timestamp) [$script_name] [$type] $msg"
 }
 
-docker-entrypoint.sh mysqld --wsrep-new-cluster $@
+/scripts/entrypoint.sh mysqld --wsrep-new-cluster $@

@@ -10,5 +10,5 @@ function log() {
     echo "$(timestamp) [$script_name] [$type] $msg"
 }
 
-export DATABASE_ALREADY_EXISTS=true
-docker-entrypoint.sh mysqld $@
+export CLUSTER_JOIN=true
+/scripts/entrypoint.sh mysqld $@

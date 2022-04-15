@@ -53,6 +53,7 @@ while [ ! -f "/run-script/pre-run-on-present.sh" ]; do
 done
 
 log "INFO" "found pre-run-on-present script"
+cat /run-script/pre-run-on-present.sh
 
 # run the pre script copied by mariadb-coordinator
 ./run-script/pre-run-on-present.sh
@@ -64,6 +65,6 @@ while [ ! -f "/run-script/run-on-present.sh" ]; do
 done
 
 log "INFO" "found run-on-present script"
-
+cat /run-script/run-on-present.sh
 # run the script copied by mariadb-coordinator and pass the arguments
 ./run-script/run-on-present.sh $@

@@ -92,73 +92,73 @@ function join {
 	echo "${joined%?}"
 }
 
-# if vault secret file exists we assume we need to turn on encryption
-vault_secret="/etc/mysql/vault-keyring-secret/keyring_vault.conf"
-if [ -f "$vault_secret" ]; then
-	sed -i "/\[mysqld\]/a early-plugin-load=keyring_vault.so" $CFG
-	sed -i "/\[mysqld\]/a keyring_vault_config=$vault_secret" $CFG
-fi
+## if vault secret file exists we assume we need to turn on encryption
+#vault_secret="/etc/mysql/vault-keyring-secret/keyring_vault.conf"
+#if [ -f "$vault_secret" ]; then
+#	sed -i "/\[mysqld\]/a early-plugin-load=keyring_vault.so" $CFG
+#	sed -i "/\[mysqld\]/a keyring_vault_config=$vault_secret" $CFG
+#fi
 
 file_env 'XTRABACKUP_PASSWORD' 'xtrabackup'
 file_env 'CLUSTERCHECK_PASSWORD' 'clustercheck'
 NODE_NAME=$(hostname -f)
 NODE_PORT=3306
-# Is running in Kubernetes/OpenShift, so find all other pods belonging to the cluster
-if [ -n "$PXC_SERVICE" ]; then
-	echo "Percona XtraDB Cluster: Finding peers"
-	/usr/bin/peer-list -on-start="/usr/bin/configure-pxc.sh" -service="${PXC_SERVICE}"
-	CLUSTER_JOIN="$(grep '^wsrep_cluster_address=' "$CFG" | cut -d '=' -f 2 | sed -e 's^.*gcomm://^^')"
-	echo "Cluster address set to: $CLUSTER_JOIN"
-elif [ -n "$DISCOVERY_SERVICE" ]; then
-	echo 'Registering in the discovery service'
-	NODE_IP=$(hostname -I | awk ' { print $1 } ')
-
-	if [ "${DISCOVERY_SERVICE:0:4}" != "http" ]; then
-		DISCOVERY_SERVICE="http://${DISCOVERY_SERVICE}"
-	fi
-	curl "$DISCOVERY_SERVICE/v2/keys/pxc-cluster/queue/$CLUSTER_NAME" -XPOST -d value="$NODE_IP" -d ttl=60
-
-	#get list of IP from queue
-	i=$(curl "$DISCOVERY_SERVICE/v2/keys/pxc-cluster/queue/$CLUSTER_NAME" | jq -r '.node.nodes[].value')
-
-	# this remove my ip from the list
-	i1="${i[@]//$NODE_IP}"
-
-	# Register the current IP in the discovery service
-	# key set to expire in 30 sec. There is a cronjob that should update them regularly
-	curl "$DISCOVERY_SERVICE/v2/keys/pxc-cluster/$CLUSTER_NAME/$NODE_IP/ipaddr" -XPUT -d value="$NODE_IP" -d ttl=30
-	curl "$DISCOVERY_SERVICE/v2/keys/pxc-cluster/$CLUSTER_NAME/$NODE_IP/hostname" -XPUT -d value="$HOSTNAME" -d ttl=30
-	curl "$DISCOVERY_SERVICE/v2/keys/pxc-cluster/$CLUSTER_NAME/$NODE_IP" -XPUT -d ttl=30 -d dir=true -d prevExist=true
-
-	i=$(curl "$DISCOVERY_SERVICE/v2/keys/pxc-cluster/$CLUSTER_NAME/?quorum=true" | jq -r '.node.nodes[]?.key' | awk -F'/' '{print $(NF)}')
-	# this remove my ip from the list
-	i2="${i[@]//$NODE_IP}"
-	CLUSTER_JOIN=$(join , $i1 $i2 )
-
-	sed -r "s|^[#]?wsrep_node_address=.*$|wsrep_node_address=${NODE_IP}|" "${CFG}" 1<> "${CFG}"
-	sed -r "s|^[#]?wsrep_cluster_name=.*$|wsrep_cluster_name=${CLUSTER_NAME}|" "${CFG}" 1<> "${CFG}"
-	sed -r "s|^[#]?wsrep_cluster_address=.*$|wsrep_cluster_address=gcomm://${CLUSTER_JOIN}|" "${CFG}" 1<> "${CFG}"
-	sed -r "s|^[#]?wsrep_node_incoming_address=.*$|wsrep_node_incoming_address=${NODE_NAME}:${NODE_PORT}|" "${CFG}" 1<> "${CFG}"
-	sed -r "s|^[#]?wsrep_sst_auth=.*$|wsrep_sst_auth='xtrabackup:${XTRABACKUP_PASSWORD}'|" "${CFG}" 1<> "${CFG}"
-
-	/usr/bin/clustercheckcron clustercheck "${CLUSTERCHECK_PASSWORD}" 1 /var/lib/mysql/clustercheck.log 1 &
-
-else
-	: checking incoming cluster parameters
-	NODE_IP=$(hostname -I | awk ' { print $1 } ')
-	sed -r "s|^[#]?wsrep_node_address=.*$|wsrep_node_address=${NODE_IP}|" "${CFG}" 1<> "${CFG}"
-	sed -r "s|^[#]?wsrep_node_incoming_address=.*$|wsrep_node_incoming_address=${NODE_NAME}:${NODE_PORT}|" "${CFG}" 1<> "${CFG}"
-	sed -r "s|^[#]?wsrep_sst_auth=.*$|wsrep_sst_auth='xtrabackup:${XTRABACKUP_PASSWORD}'|" "${CFG}" 1<> "${CFG}"
-
-	if [[ -n "${CLUSTER_JOIN}" ]]; then
-		sed -r "s|^[#]?wsrep_cluster_address=.*$|wsrep_cluster_address=gcomm://${CLUSTER_JOIN}|" "${CFG}" 1<> "${CFG}"
-	fi
-
-	if [[ -n "${CLUSTER_NAME}" ]]; then
-		sed -r "s|^[#]?wsrep_cluster_name=.*$|wsrep_cluster_name=${CLUSTER_NAME}|" "${CFG}" 1<> "${CFG}"
-	fi
-
-fi
+## Is running in Kubernetes/OpenShift, so find all other pods belonging to the cluster
+#if [ -n "$PXC_SERVICE" ]; then
+#	echo "Percona XtraDB Cluster: Finding peers"
+#	/usr/bin/peer-list -on-start="/usr/bin/configure-pxc.sh" -service="${PXC_SERVICE}"
+#	CLUSTER_JOIN="$(grep '^wsrep_cluster_address=' "$CFG" | cut -d '=' -f 2 | sed -e 's^.*gcomm://^^')"
+#	echo "Cluster address set to: $CLUSTER_JOIN"
+#elif [ -n "$DISCOVERY_SERVICE" ]; then
+#	echo 'Registering in the discovery service'
+#	NODE_IP=$(hostname -I | awk ' { print $1 } ')
+#
+#	if [ "${DISCOVERY_SERVICE:0:4}" != "http" ]; then
+#		DISCOVERY_SERVICE="http://${DISCOVERY_SERVICE}"
+#	fi
+#	curl "$DISCOVERY_SERVICE/v2/keys/pxc-cluster/queue/$CLUSTER_NAME" -XPOST -d value="$NODE_IP" -d ttl=60
+#
+#	#get list of IP from queue
+#	i=$(curl "$DISCOVERY_SERVICE/v2/keys/pxc-cluster/queue/$CLUSTER_NAME" | jq -r '.node.nodes[].value')
+#
+#	# this remove my ip from the list
+#	i1="${i[@]//$NODE_IP}"
+#
+#	# Register the current IP in the discovery service
+#	# key set to expire in 30 sec. There is a cronjob that should update them regularly
+#	curl "$DISCOVERY_SERVICE/v2/keys/pxc-cluster/$CLUSTER_NAME/$NODE_IP/ipaddr" -XPUT -d value="$NODE_IP" -d ttl=30
+#	curl "$DISCOVERY_SERVICE/v2/keys/pxc-cluster/$CLUSTER_NAME/$NODE_IP/hostname" -XPUT -d value="$HOSTNAME" -d ttl=30
+#	curl "$DISCOVERY_SERVICE/v2/keys/pxc-cluster/$CLUSTER_NAME/$NODE_IP" -XPUT -d ttl=30 -d dir=true -d prevExist=true
+#
+#	i=$(curl "$DISCOVERY_SERVICE/v2/keys/pxc-cluster/$CLUSTER_NAME/?quorum=true" | jq -r '.node.nodes[]?.key' | awk -F'/' '{print $(NF)}')
+#	# this remove my ip from the list
+#	i2="${i[@]//$NODE_IP}"
+#	CLUSTER_JOIN=$(join , $i1 $i2 )
+#
+#	sed -r "s|^[#]?wsrep_node_address=.*$|wsrep_node_address=${NODE_IP}|" "${CFG}" 1<> "${CFG}"
+#	sed -r "s|^[#]?wsrep_cluster_name=.*$|wsrep_cluster_name=${CLUSTER_NAME}|" "${CFG}" 1<> "${CFG}"
+#	sed -r "s|^[#]?wsrep_cluster_address=.*$|wsrep_cluster_address=gcomm://${CLUSTER_JOIN}|" "${CFG}" 1<> "${CFG}"
+#	sed -r "s|^[#]?wsrep_node_incoming_address=.*$|wsrep_node_incoming_address=${NODE_NAME}:${NODE_PORT}|" "${CFG}" 1<> "${CFG}"
+#	sed -r "s|^[#]?wsrep_sst_auth=.*$|wsrep_sst_auth='xtrabackup:${XTRABACKUP_PASSWORD}'|" "${CFG}" 1<> "${CFG}"
+#
+#	/usr/bin/clustercheckcron clustercheck "${CLUSTERCHECK_PASSWORD}" 1 /var/lib/mysql/clustercheck.log 1 &
+#
+#else
+#	: checking incoming cluster parameters
+#	NODE_IP=$(hostname -I | awk ' { print $1 } ')
+#	sed -r "s|^[#]?wsrep_node_address=.*$|wsrep_node_address=${NODE_IP}|" "${CFG}" 1<> "${CFG}"
+#	sed -r "s|^[#]?wsrep_node_incoming_address=.*$|wsrep_node_incoming_address=${NODE_NAME}:${NODE_PORT}|" "${CFG}" 1<> "${CFG}"
+#	sed -r "s|^[#]?wsrep_sst_auth=.*$|wsrep_sst_auth='xtrabackup:${XTRABACKUP_PASSWORD}'|" "${CFG}" 1<> "${CFG}"
+#
+#	if [[ -n "${CLUSTER_JOIN}" ]]; then
+#		sed -r "s|^[#]?wsrep_cluster_address=.*$|wsrep_cluster_address=gcomm://${CLUSTER_JOIN}|" "${CFG}" 1<> "${CFG}"
+#	fi
+#
+#	if [[ -n "${CLUSTER_NAME}" ]]; then
+#		sed -r "s|^[#]?wsrep_cluster_name=.*$|wsrep_cluster_name=${CLUSTER_NAME}|" "${CFG}" 1<> "${CFG}"
+#	fi
+#
+#fi
 
 # if we have CLUSTER_JOIN - then we do not need to perform datadir initialize
 # the data will be copied from another node
@@ -191,18 +191,18 @@ if [ -z "$CLUSTER_JOIN" ] && [ "$1" = 'mysqld' -a -z "$wantHelp" ]; then
 		mysql=( mysql --protocol=socket -uroot -hlocalhost --socket="${SOCKET}" --password="" )
 		wsrep_local_state_select="SELECT variable_value FROM performance_schema.global_status WHERE variable_name='wsrep_local_state_comment'"
 
-		for i in {120..0}; do
-			wsrep_local_state=$(echo "$wsrep_local_state_select" | "${mysql[@]}" -s 2> /dev/null) || true
-			if [ "$wsrep_local_state" = 'Synced' ]; then
-				break
-			fi
-			echo 'MySQL init process in progress...'
-			sleep 1
-		done
-		if [ "$i" = 0 ]; then
-			echo >&2 'MySQL init process failed.'
-			exit 1
-		fi
+#		for i in {120..0}; do
+#			wsrep_local_state=$(echo "$wsrep_local_state_select" | "${mysql[@]}" -s 2> /dev/null) || true
+#			if [ "$wsrep_local_state" = 'Synced' ]; then
+#				break
+#			fi
+#			echo 'MySQL init process in progress...'
+#			sleep 1
+#		done
+#		if [ "$i" = 0 ]; then
+#			echo >&2 'MySQL init process failed.'
+#			exit 1
+#		fi
 
 		if [ -z "$MYSQL_INITDB_SKIP_TZINFO" ]; then
 			# sed is for https://bugs.mysql.com/bug.php?id=20545
@@ -337,48 +337,48 @@ if [ "$1" = 'mysqld' -a -z "$wantHelp" ]; then
 	grep -v wsrep_sst_auth "$CFG"
 fi
 
-wsrep_start_position_opt=""
-if [ "$1" = 'mysqld' -a -z "$wantHelp" ]; then
-	DATADIR="$(_get_config 'datadir' "$@")"
-	grastate_loc="${DATADIR}/grastate.dat"
+#wsrep_start_position_opt=""
+#if [ "$1" = 'mysqld' -a -z "$wantHelp" ]; then
+#	DATADIR="$(_get_config 'datadir' "$@")"
+#	grastate_loc="${DATADIR}/grastate.dat"
+#
+#	if [ -s "$grastate_loc" -a -d "$DATADIR/mysql" ]; then
+#		uuid=$(grep 'uuid:' "$grastate_loc" | cut -d: -f2 | tr -d ' ' || :)
+#		seqno=$(grep 'seqno:' "$grastate_loc" | cut -d: -f2 | tr -d ' ' || :)
+#
+#		# If sequence number is not equal to -1, wsrep-recover co-ordinates aren't used.
+#		# lp:1112724
+#		# So, directly pass whatever is obtained from grastate.dat
+#		if [ -n "$seqno" ] && [ "$seqno" -ne -1 ]; then
+#			echo "Skipping wsrep-recover for $uuid:$seqno pair"
+#			echo "Assigning $uuid:$seqno to wsrep_start_position"
+#			wsrep_start_position_opt="--wsrep_start_position=$uuid:$seqno"
+#		fi
+#	fi
+#
+#	if [ -z "$wsrep_start_position_opt" -a -d "$DATADIR/mysql" ]; then
+#		wsrep_verbose_logfile=$(mktemp $DATADIR/wsrep_recovery_verbose.XXXXXX)
+#		"$@" --wsrep_recover --log-error-verbosity=3 --log_error="$wsrep_verbose_logfile"
+#
+#		if grep ' Recovered position:' "$wsrep_verbose_logfile"; then
+#			start_pos="$(
+#				grep ' Recovered position:' "$wsrep_verbose_logfile" \
+#					| sed 's/.*\ Recovered\ position://' \
+#					| sed 's/^[ \t]*//'
+#			)"
+#			wsrep_start_position_opt="--wsrep_start_position=$start_pos"
+#		else
+#			# The server prints "..skipping position recovery.." if started without wsrep.
+#			if grep 'skipping position recovery' "$wsrep_verbose_logfile"; then
+#				echo "WSREP: Position recovery skipped"
+#			else
+#				echo >&2 "WSREP: Failed to recover position: "
+#				cat "$wsrep_verbose_logfile"
+#				exit 1
+#			fi
+#		fi
+#		rm "$wsrep_verbose_logfile"
+#	fi
+#fi
 
-	if [ -s "$grastate_loc" -a -d "$DATADIR/mysql" ]; then
-		uuid=$(grep 'uuid:' "$grastate_loc" | cut -d: -f2 | tr -d ' ' || :)
-		seqno=$(grep 'seqno:' "$grastate_loc" | cut -d: -f2 | tr -d ' ' || :)
-
-		# If sequence number is not equal to -1, wsrep-recover co-ordinates aren't used.
-		# lp:1112724
-		# So, directly pass whatever is obtained from grastate.dat
-		if [ -n "$seqno" ] && [ "$seqno" -ne -1 ]; then
-			echo "Skipping wsrep-recover for $uuid:$seqno pair"
-			echo "Assigning $uuid:$seqno to wsrep_start_position"
-			wsrep_start_position_opt="--wsrep_start_position=$uuid:$seqno"
-		fi
-	fi
-
-	if [ -z "$wsrep_start_position_opt" -a -d "$DATADIR/mysql" ]; then
-		wsrep_verbose_logfile=$(mktemp $DATADIR/wsrep_recovery_verbose.XXXXXX)
-		"$@" --wsrep_recover --log-error-verbosity=3 --log_error="$wsrep_verbose_logfile"
-
-		if grep ' Recovered position:' "$wsrep_verbose_logfile"; then
-			start_pos="$(
-				grep ' Recovered position:' "$wsrep_verbose_logfile" \
-					| sed 's/.*\ Recovered\ position://' \
-					| sed 's/^[ \t]*//'
-			)"
-			wsrep_start_position_opt="--wsrep_start_position=$start_pos"
-		else
-			# The server prints "..skipping position recovery.." if started without wsrep.
-			if grep 'skipping position recovery' "$wsrep_verbose_logfile"; then
-				echo "WSREP: Position recovery skipped"
-			else
-				echo >&2 "WSREP: Failed to recover position: "
-				cat "$wsrep_verbose_logfile"
-				exit 1
-			fi
-		fi
-		rm "$wsrep_verbose_logfile"
-	fi
-fi
-
-exec "$@" $wsrep_start_position_opt
+exec "$@" #$wsrep_start_position_opt

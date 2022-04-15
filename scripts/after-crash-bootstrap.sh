@@ -14,4 +14,4 @@ function log() {
 sed -i -e 's/safe_to_bootstrap: 0/safe_to_bootstrap: 1/g' /var/lib/mysql/grastate.dat
 
 # bootstrap new cluster
-docker-entrypoint.sh mysqld --wsrep-new-cluster $@
+/scripts/entrypoint.sh mysqld --wsrep-new-cluster $@
