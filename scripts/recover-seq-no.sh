@@ -10,4 +10,4 @@ function log() {
     echo "$(timestamp) [$script_name] [$type] $msg"
 }
 
-export line=$(docker-entrypoint.sh mysqld --wsrep-recover 2>&1 | grep "Recovered position:" | xargs echo) && echo -n ${line##*:} >/scripts/seqno
+export line=$(/scripts/entrypoint.sh mysqld --wsrep-recover 2>&1 | grep "Recovered position:" | xargs echo) && echo -n ${line##*:} >/scripts/seqno
