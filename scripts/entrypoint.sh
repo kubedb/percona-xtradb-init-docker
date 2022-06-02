@@ -189,10 +189,6 @@ if [[ $MYSQL_VERSION == '8.0' ]]; then
 	fi
 fi
 
-file_env 'XTRABACKUP_PASSWORD' 'xtrabackup' 'xtrabackup'
-file_env 'CLUSTERCHECK_PASSWORD' '' 'clustercheck'
-
-
 # configure node.cnf for galera cluster
 
 NODE_IP=$(hostname -I | awk ' { print $1 } ')
@@ -213,19 +209,14 @@ fi
 if [ "$IS_LOGCOLLECTOR" == 'yes' ]; then
 	grep -E -q "^[#]?log-error" "$CFG" || sed "/^\[mysqld\]/a log-error=$LOG_DATA_DIR/mysqld-error.log\n" ${CFG} 1<>${CFG}
 fi
-#grep -E -q "^[#]?wsrep_sst_donor" "$CFG" || sed '/^\[mysqld\]/a wsrep_sst_donor=\n' ${CFG} 1<>${CFG}
 grep -E -q "^[#]?wsrep_node_incoming_address" "$CFG" || sed '/^\[mysqld\]/a wsrep_node_incoming_address=\n' ${CFG} 1<>${CFG}
 grep -E -q "^[#]?wsrep_provider_options" "$CFG" || sed '/^\[mysqld\]/a wsrep_provider_options="pc.weight=10"\n' ${CFG} 1<>${CFG}
-#sed -r "s|^[#]?server_id=.*$|server_id=${SERVER_ID}|" ${CFG} 1<>${CFG}
 sed -r "s|^[#]?coredumper$|coredumper|" ${CFG} 1<>${CFG}
 sed -r "s|^[#]?wsrep_node_address=.*$|wsrep_node_address=${NODE_IP}|" ${CFG} 1<>${CFG}
 sed -r "s|^[#]?wsrep_cluster_name=.*$|wsrep_cluster_name=${CLUSTER_NAME}|" ${CFG} 1<>${CFG}
-#sed -r "s|^[#]?wsrep_sst_donor=.*$|wsrep_sst_donor=${DONOR_ADDRESS}|" ${CFG} 1<>${CFG}
 sed -r "s|^[#]?wsrep_cluster_address=.*$|wsrep_cluster_address=gcomm://${WSREP_CLUSTER_ADDRESS}|" ${CFG} 1<>${CFG}
 sed -r "s|^[#]?wsrep_node_incoming_address=.*$|wsrep_node_incoming_address=${NODE_NAME}:${NODE_PORT}|" ${CFG} 1<>${CFG}
 { set +x; } 2>/dev/null
-ESCAPED_XTRABACKUP_PASSWORD=$(printf '%s\n' "$XTRABACKUP_PASSWORD" | sed -e 's/[]\|\&\!$*.^[]/\\&/g')
-sed -r "s|^[#]?wsrep_sst_auth=.*$|wsrep_sst_auth='xtrabackup:$ESCAPED_XTRABACKUP_PASSWORD'|" ${CFG} 1<>${CFG}
 set -x
 sed -r "s|^[#]?admin-address=.*$|admin-address=${NODE_IP}|" ${CFG} 1<>${CFG}
 sed -r "s|^[#]?extra_max_connections=.*$|extra_max_connections=100|" ${CFG} 1<>${CFG}
@@ -324,23 +315,7 @@ if [ -z "$CLUSTER_JOIN" ] && [ "$1" = 'mysqld' -a -z "$wantHelp" ]; then
 			EOSQL
 		fi
 
-		file_env 'MONITOR_HOST' 'localhost'
-		file_env 'MONITOR_PASSWORD' 'monitor' 'monitor'
 		file_env 'REPLICATION_PASSWORD' 'replication' 'replication'
-		if [ "$MYSQL_VERSION" == '8.0' ]; then
-			read -r -d '' monitorConnectGrant <<-EOSQL || true
-				GRANT SERVICE_CONNECTION_ADMIN ON *.* TO 'monitor'@'${MONITOR_HOST}';
-			EOSQL
-		fi
-
-		# SYSTEM_USER since 8.0.16
-		# https://dev.mysql.com/doc/refman/8.0/en/privileges-provided.html#priv_system-user
-		if [[ $MYSQL_VERSION == "8.0" ]] && ((MYSQL_PATCH_VERSION >= 16)); then
-			read -r -d '' systemUserGrant <<-EOSQL || true
-				GRANT SYSTEM_USER ON *.* TO 'monitor'@'${MONITOR_HOST}';
-				GRANT SYSTEM_USER ON *.* TO 'clustercheck'@'localhost';
-			EOSQL
-		fi
 
 		"${mysql[@]}" <<-EOSQL
 			-- What's done in this file shouldn't be replicated
@@ -352,22 +327,6 @@ if [ -z "$CLUSTER_JOIN" ] && [ "$1" = 'mysqld' -a -z "$wantHelp" ]; then
 			GRANT ALL ON *.* TO 'root'@'localhost' WITH GRANT OPTION ;
 			${rootCreate}
 			/*!80016 REVOKE SYSTEM_USER ON *.* FROM root */;
-
-			CREATE USER 'operator'@'${MYSQL_ROOT_HOST}' IDENTIFIED BY '${OPERATOR_ADMIN_PASSWORD}' ;
-			GRANT ALL ON *.* TO 'operator'@'${MYSQL_ROOT_HOST}' WITH GRANT OPTION ;
-
-			CREATE USER 'xtrabackup'@'%' IDENTIFIED BY '${XTRABACKUP_PASSWORD}';
-			GRANT ALL ON *.* TO 'xtrabackup'@'%';
-
-			CREATE USER 'monitor'@'${MONITOR_HOST}' IDENTIFIED BY '${MONITOR_PASSWORD}' WITH MAX_USER_CONNECTIONS 100;
-			GRANT SELECT, PROCESS, SUPER, REPLICATION CLIENT, RELOAD ON *.* TO 'monitor'@'${MONITOR_HOST}';
-			GRANT SELECT ON performance_schema.* TO 'monitor'@'${MONITOR_HOST}';
-			${monitorConnectGrant}
-
-			CREATE USER 'clustercheck'@'localhost' IDENTIFIED BY '${CLUSTERCHECK_PASSWORD}';
-			GRANT PROCESS ON *.* TO 'clustercheck'@'localhost';
-
-			${systemUserGrant}
 
 			CREATE USER 'replication'@'%' IDENTIFIED BY '${REPLICATION_PASSWORD}';
 			GRANT REPLICATION SLAVE ON *.* to 'replication'@'%';
@@ -448,9 +407,6 @@ if [ "$1" = 'mysqld' -a -z "$wantHelp" ]; then
 
 		mysql=(mysql --protocol=socket -uoperator -hlocalhost --socket="${SOCKET}" --password="")
 		{ set +x; } 2>/dev/null
-		if [ ! -z "$OPERATOR_ADMIN_PASSWORD" ]; then
-			mysql+=(-p"${OPERATOR_ADMIN_PASSWORD}")
-		fi
 		set -x
 
 		for i in {120..0}; do
