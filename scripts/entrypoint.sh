@@ -318,8 +318,6 @@ if [ -z "$CLUSTER_JOIN" ] && [ "$1" = 'mysqld' -a -z "$wantHelp" ]; then
 		file_env 'REPLICATION_PASSWORD' 'replication' 'replication'
 
 		"${mysql[@]}" <<-EOSQL
-			-- What's done in this file shouldn't be replicated
-			--  or products like mysql-fabric won't work
 			SET @@SESSION.SQL_LOG_BIN=0;
 
 			DELETE FROM mysql.user WHERE user NOT IN ('mysql.sys', 'mysqlxsys', 'root', 'mysql.infoschema', 'mysql.pxc.internal.session', 'mysql.pxc.sst.role', 'mysql.session') OR host NOT IN ('localhost') ;
@@ -328,9 +326,14 @@ if [ -z "$CLUSTER_JOIN" ] && [ "$1" = 'mysqld' -a -z "$wantHelp" ]; then
 			${rootCreate}
 			/*!80016 REVOKE SYSTEM_USER ON *.* FROM root */;
 
-			CREATE USER 'replication'@'%' IDENTIFIED BY '${REPLICATION_PASSWORD}';
-			GRANT REPLICATION SLAVE ON *.* to 'replication'@'%';
-			DROP DATABASE IF EXISTS test;
+      CREATE USER '${MONITOR_USERNAME}'@'localhost' IDENTIFIED BY '${MONITOR_PASSWORD}' WITH MAX_USER_CONNECTIONS 100;
+      GRANT SELECT, PROCESS, SUPER, REPLICATION CLIENT, RELOAD ON *.* TO '${MONITOR_USERNAME}'@'localhost';
+      GRANT SELECT ON performance_schema.* TO '${MONITOR_USERNAME}'@'localhost';
+      GRANT SERVICE_CONNECTION_ADMIN ON *.* TO '${MONITOR_USERNAME}'@'localhost';
+      FLUSH PRIVILEGES ;
+
+			CREATE USER '${REPLICATION_USERNAME}'@'%' IDENTIFIED BY '${REPLICATION_PASSWORD}' REQUIRE SSL;
+			GRANT REPLICATION SLAVE ON *.* to '${REPLICATION_USERNAME}'@'%';
 			FLUSH PRIVILEGES ;
 		EOSQL
 
