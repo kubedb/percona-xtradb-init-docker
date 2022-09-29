@@ -408,8 +408,11 @@ if [ "$1" = 'mysqld' -a -z "$wantHelp" ]; then
 		"$@" --skip-networking --socket="${SOCKET}" --wsrep-provider='none' &
 		pid="$!"
 
-		mysql=(mysql --protocol=socket -uoperator -hlocalhost --socket="${SOCKET}" --password="")
+		mysql=(mysql --protocol=socket -uroot -hlocalhost --socket="${SOCKET}" --password="")
 		{ set +x; } 2>/dev/null
+		if [ ! -z "$MYSQL_ROOT_PASSWORD" ]; then
+			mysql+=(-p"$MYSQL_ROOT_PASSWORD")
+		fi
 		set -x
 
 		for i in {120..0}; do
