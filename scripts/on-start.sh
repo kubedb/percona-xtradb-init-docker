@@ -19,7 +19,6 @@ while [ ! -f "/scripts/peer-list" ]; do
 done
 log "INFO" "found peer-list file"
 
-
 # wait for the pre script copied by coordinator
 log "WARNING" "waiting for pre-run-on-present script to come"
 while [ ! -f "/run-script/pre-run-on-present.sh" ]; do
