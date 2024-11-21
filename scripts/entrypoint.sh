@@ -322,6 +322,7 @@ if [ -z "$CLUSTER_JOIN" ] && [ "$1" = 'mysqld' -a -z "$wantHelp" ]; then
 			ALTER USER 'root'@'localhost' IDENTIFIED BY '${MYSQL_ROOT_PASSWORD}' ;
 			GRANT ALL ON *.* TO 'root'@'localhost' WITH GRANT OPTION ;
 			${rootCreate}
+
 			/*!80016 REVOKE SYSTEM_USER ON *.* FROM root */;
 
       CREATE USER '${MONITOR_USERNAME}'@'localhost' IDENTIFIED BY '${MONITOR_PASSWORD}' WITH MAX_USER_CONNECTIONS 100;
@@ -332,6 +333,8 @@ if [ -z "$CLUSTER_JOIN" ] && [ "$1" = 'mysqld' -a -z "$wantHelp" ]; then
 
 			CREATE USER '${REPLICATION_USERNAME}'@'%' IDENTIFIED BY '${REPLICATION_PASSWORD}' REQUIRE SSL;
 			GRANT REPLICATION SLAVE ON *.* to '${REPLICATION_USERNAME}'@'%';
+			FLUSH PRIVILEGES ;
+			GRANT SYSTEM_USER ON *.* TO 'root'@'%';
 			FLUSH PRIVILEGES ;
 		EOSQL
 
