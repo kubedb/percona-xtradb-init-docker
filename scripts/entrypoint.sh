@@ -155,8 +155,7 @@ vault_secret="/etc/mysql/vault-keyring-secret/keyring_vault.conf"
 if [ -f "$vault_secret" ]; then
     sed -i "/\[mysqld\]/a early-plugin-load=keyring_vault.so" $CFG
     sed -i "/\[mysqld\]/a keyring_vault_config=$vault_secret" $CFG
-
-    if [ "$MYSQL_VERSION" == '8.0' ]; then
+    if [ "$(printf '%s\n' "$MYSQL_VERSION" "8.0" | sort -V | head -n1)" == "8.0" ]; then
         sed -i "/\[mysqld\]/a default_table_encryption=ON" $CFG
         sed -i "/\[mysqld\]/a table_encryption_privilege_check=ON" $CFG
         sed -i "/\[mysqld\]/a innodb_undo_log_encrypt=ON" $CFG
@@ -198,7 +197,7 @@ NODE_PORT=3306
 
 CFG=/etc/mysql/node.cnf
 MYSQL_VERSION=$(mysqld -V | awk '{print $3}' | awk -F'.' '{print $1"."$2}')
-if [ "$MYSQL_VERSION" == '8.0' ]; then
+if [ "$(printf '%s\n' "$MYSQL_VERSION" "8.0" | sort -V | head -n1)" == "8.0" ]; then
     grep -E -q "^[#]?admin-address" "$CFG" || sed '/^\[mysqld\]/a admin-address=\n' ${CFG} 1<>${CFG}
     grep -E -q "^[#]?log_error_suppression_list" "$CFG" || sed '/^\[mysqld\]/a log_error_suppression_list="MY-010055"\n' ${CFG} 1<>${CFG}
 else
@@ -259,7 +258,7 @@ if [ -z "$CLUSTER_JOIN" ] && [ "$1" = 'mysqld' -a -z "$wantHelp" ]; then
         echo 'Initializing database'
         # we initialize database into $TMPDIR because "--initialize-insecure" option does not work if directory is not empty
         # in some cases storage driver creates unremovable artifacts (see K8SPXC-286), so $DATADIR cleanup is not possible
-        "$@" --initialize-insecure --skip-ssl --datadir="$TMPDIR"
+        "$@" --initialize-insecure --datadir="$TMPDIR"
         mv "$TMPDIR"/* "$DATADIR/"
         rm -rfv "$TMPDIR"
         echo 'Database initialized'
