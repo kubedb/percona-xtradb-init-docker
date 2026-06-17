@@ -147,6 +147,30 @@ function join {
     echo "${joined%?}"
 }
 
+# detect_mysql_version parses `mysqld --version` and exports MYSQL_MAJOR /
+# MYSQL_MINOR / MYSQL_PATCH. Falls back to "8.0.0" if parsing fails.
+detect_mysql_version() {
+    local raw
+    raw=$(mysqld -V 2>/dev/null | grep -oE 'Ver [0-9]+\.[0-9]+\.[0-9]+' | head -1 | awk '{print $2}')
+    if [[ -z "$raw" ]]; then
+        raw="8.0.0"
+    fi
+    MYSQL_MAJOR=${raw%%.*}
+    local rest=${raw#*.}
+    MYSQL_MINOR=${rest%%.*}
+    MYSQL_PATCH=${rest#*.}
+}
+
+# version_ge MAJ MIN — returns 0 if detected version >= MAJ.MIN, else 1.
+version_ge() {
+    local want_major=$1 want_minor=$2
+    if [[ "$MYSQL_MAJOR" -gt "$want_major" ]]; then return 0; fi
+    if [[ "$MYSQL_MAJOR" -eq "$want_major" && "$MYSQL_MINOR" -ge "$want_minor" ]]; then return 0; fi
+    return 1
+}
+
+detect_mysql_version
+
 MYSQL_VERSION=$(mysqld -V | awk '{print $3}' | awk -F'.' '{print $1"."$2}')
 MYSQL_PATCH_VERSION=$(mysqld -V | awk '{print $3}' | awk -F'.' '{print $3}' | awk -F'-' '{print $1}')
 
@@ -327,13 +351,13 @@ if [ -z "$CLUSTER_JOIN" ] && [ "$1" = 'mysqld' -a -z "$wantHelp" ]; then
       CREATE USER '${MONITOR_USERNAME}'@'localhost' IDENTIFIED BY '${MONITOR_PASSWORD}' WITH MAX_USER_CONNECTIONS 100;
       GRANT SELECT, PROCESS, SUPER, REPLICATION CLIENT, RELOAD ON *.* TO '${MONITOR_USERNAME}'@'localhost';
       GRANT SELECT ON performance_schema.* TO '${MONITOR_USERNAME}'@'localhost';
-      GRANT SERVICE_CONNECTION_ADMIN ON *.* TO '${MONITOR_USERNAME}'@'localhost';
+      /*!80014 GRANT SERVICE_CONNECTION_ADMIN ON *.* TO '${MONITOR_USERNAME}'@'localhost' */;
       FLUSH PRIVILEGES ;
 
 			CREATE USER '${REPLICATION_USERNAME}'@'%' IDENTIFIED BY '${REPLICATION_PASSWORD}' REQUIRE SSL;
 			GRANT REPLICATION SLAVE ON *.* to '${REPLICATION_USERNAME}'@'%';
 			FLUSH PRIVILEGES ;
-			GRANT SYSTEM_USER ON *.* TO 'root'@'%';
+			/*!80016 GRANT SYSTEM_USER ON *.* TO 'root'@'%' */;
 			FLUSH PRIVILEGES ;
 		EOSQL
 
@@ -435,6 +459,16 @@ if [ "$1" = 'mysqld' -a -z "$wantHelp" ]; then
     fi
     "$@" --version | sed 's/-ps//' >"$DATADIR/version_info"
     grep -v wsrep_sst_auth "$CFG"
+fi
+
+# PXC 5.x uses wsrep_sst_auth for xtrabackup SST credentials; 8.0+ uses
+# a dynamically generated temporary user instead and ignores wsrep_sst_auth.
+if [[ "$MYSQL_MAJOR" -lt 8 ]]; then
+    { set +x; } 2>/dev/null
+    if [ -n "$MYSQL_ROOT_PASSWORD" ]; then
+        sed -i "s|^wsrep_sst_auth=.*$|wsrep_sst_auth=\"root:${MYSQL_ROOT_PASSWORD}\"|" "$CFG"
+    fi
+    set -x
 fi
 
 # run the mysqld
